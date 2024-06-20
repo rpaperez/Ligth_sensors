@@ -3,7 +3,7 @@
 
 
 # Load packages -----------------------------------------------------------
-packs <- c("lubridate", "stringr", 'tidyverse','viridis','data.table','cowplot')
+packs <- c("lubridate", "stringr", 'tidyverse','viridis','data.table','cowplot','plotly')
 InstIfNec<-function (pack) {
   if (!do.call(require,as.list(pack))) {
     do.call(install.packages,as.list(pack))  }
@@ -29,44 +29,96 @@ tableSlot=data.frame(sensor=c("T0 S2","T1 S3","T2 S1","T3 S1","T4 S1","T5 S1","T
 
 
 ## start time
+donT=data.table::fread(input = '0-data/PAR Time.csv') %>% 
+  mutate(start=dmy_hms(paste0(`Day of setting`,'_',`Setting Time`,':00')),
+         end=dmy_hms(paste0(`Day of taking`,'_',`Taking time`,':00'))) %>% 
+  data.frame()
 
-start=ymd_hms('2024-05-03 15:01:00')
+
 # load the data -----------------------------------------------------------
 
-don_raw=data.table::fread(input = '0-data/DATA.CSV') %>% 
-  mutate(time=start+Timestamp,
-           ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
-  tidyr::separate(col = ref,into =vecName ,sep='#') 
+allDat=NULL #init
+files=list.files(path = '0-data/',pattern = 'DATA')
 
-don=don_raw %>% select(ID,Timestamp,Days,Hours,Minutes,time,RawData)
-for (i in 1: nbSlots){
-  dsub=don_raw %>%
-    mutate(info=paste(get(paste0('slot',i)),get(paste0('value',i))))
+for (file in files){
+  # file=files[1]
   
-  colnames(dsub)[colnames(dsub)=='info']=paste0('info',i)
+  TimeStart=ymd_hms(donT[donT$File==str_remove(file,'.CSV'),'start'])
   
-  don=cbind(don,dsub %>% 
-    select(paste0('info',i)))
+  don_raw=data.table::fread(input = paste0('0-data/',file)) %>% 
+    mutate(time=TimeStart+Timestamp,
+           ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
+    tidyr::separate(col = ref,into =vecName ,sep='#') 
+  
+  don=don_raw %>% select(ID,Timestamp,Days,Hours,Minutes,time,RawData)
+  for (i in 1: nbSlots){
+    dsub=don_raw %>%
+      mutate(info=paste(get(paste0('slot',i)),get(paste0('value',i))))
+    
+    colnames(dsub)[colnames(dsub)=='info']=paste0('info',i)
+    
+    don=cbind(don,dsub %>% 
+                select(paste0('info',i)))
+    
+  }
+  
+  
+  donF=don %>%
+    tidyr::gather(key = 'info',value = 'value',contains('info')) %>% 
+    mutate(value=str_remove(value,'_A11')) %>% 
+    tidyr::separate(col = value,into = c('sensor','tension'),sep = '_') %>% 
+    mutate(tension=as.numeric(tension),
+           DATA=file)
+  
+  
+  donF=merge(donF,tableSlot)
+  allDat=rbind(allDat,donF)
   
 }
 
 
-donF=don %>%
-  tidyr::gather(key = 'info',value = 'value',contains('info')) %>% 
-  mutate(value=str_remove(value,'_A11')) %>% 
-  tidyr::separate(col = value,into = c('sensor','tension'),sep = '_') %>% 
-mutate(tension=as.numeric(tension))
+
+# plots -------------------------------------------------------------------
 
 
-donF=merge(donF,tableSlot)
-
-donF %>%
+donPlot=allDat %>%
   filter(variable %in% c('PAR','FR','Battery','Temperature')) %>% 
+  mutate(Date=str_sub(time,1,10),
+         hms=hms(str_sub(time,12,19)),
+         tension=ifelse(sensor=='T3 S1',tension*coefFR,tension),
+         tension=ifelse(sensor=='T2 S1',tension*coefPAR,tension))
+
+
+donPlot %>%
+  filter(variable %in% c('PAR','FR','Battery','Temperature')) %>%
   mutate(tension=ifelse(sensor=='T3 S1',tension*coefFR,tension)) %>%
   mutate(tension=ifelse(sensor=='T2 S1',tension*coefPAR,tension)) %>%
-  ggplot(aes(x=time,y=tension,col=sensor))+
+  ggplot(aes(x=time,y=tension,col=sensor,group=DATA))+
   geom_line()+
   facet_wrap(~variable,scale='free_y')+
   scale_x_datetime()+
   labs(y='')
 
+ggplotly(donPlot%>% filter(variable %in% c('PAR','FR')) %>% 
+           ggplot(aes(x=time,y=tension,col=variable,group=DATA))+
+           geom_line()+
+           scale_x_datetime())
+
+ggplot()+
+  geom_line(data=donPlot %>% filter(variable %in% c('PAR','FR')),aes(x=hms,y=tension,col=variable))+
+  facet_wrap(~Date)+
+  scale_x_time()+
+  ylab(expression('PFD '*(mu*mol*' '*m**-2*' '*s**-1)))
+
+#### test the %FR with time and hour of the day
+merge(donPlot%>% filter(variable=='PAR') %>% 
+  mutate(PAR=tension) %>% 
+  select(Date,time,hms,PAR),
+  donPlot%>% filter(variable=='FR') %>% 
+  mutate(FR=tension) %>% 
+  select(Date,time,hms,FR)) %>% 
+  filter(FR>0 & PAR>0) %>% 
+  mutate(ratio=FR/(FR+PAR)) %>% 
+  ggplot(aes(x=hms,y=ratio,group=Date,col=PAR))+
+  geom_line()+
+  scale_x_time()
