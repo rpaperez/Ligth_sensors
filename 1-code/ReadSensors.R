@@ -29,11 +29,11 @@ tableSlot=data.frame(sensor=c("T0 S2","T1 S3","T2 S1","T3 S1","T4 S1","T5 S1","T
 
 
 ## start time
-donT=data.table::fread(input = '0-data/PAR Time.csv') %>% 
+donT=data.table::fread(input = '0-data/PAR Time.csv') %>%
+  filter(File!='') %>% 
   mutate(start=dmy_hms(paste0(`Day of setting`,'_',`Setting Time`,':00')),
          end=dmy_hms(paste0(`Day of taking`,'_',`Taking time`,':00'))) %>% 
-  data.frame()
-
+  data.frame() 
 
 # load the data -----------------------------------------------------------
 
