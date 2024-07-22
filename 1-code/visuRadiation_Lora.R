@@ -45,13 +45,14 @@ tableSlot=rbind(tableSlot_C1,tableSlot_C2)
 # load the data -----------------------------------------------------------
 
 allDat=NULL #init
-files=list.files(path = '0-data/',pattern = 'Chap4')
+files=list.files(path = '0-data/',pattern = 'LORA')
 
 for (file in files){
   # file=files[1]
   
 
   don_raw=data.table::fread(input = paste0('0-data/',file)) %>% 
+    data.frame() %>% 
     mutate(Date=dmy(Date),
            time=ymd_hms(paste(Date,Heure)),
            ref=str_sub(COM,start=1,end=str_length(COM)-1)) %>% 

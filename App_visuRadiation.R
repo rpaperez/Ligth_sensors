@@ -63,11 +63,11 @@ tableSlot=data.frame(sensor=c("T0 S2","T1 S3","T2 S1","T3 S1","T4 S1","T5 S1","T
 
 
 ## start time
-donT=data.table::fread(input = '0-data/PAR Time.csv') %>%
-  filter(File!='') %>% 
-  mutate(start=dmy_hms(paste0(`Day of setting`,'_',`Setting Time`,':00')),
-         end=dmy_hms(paste0(`Day of taking`,'_',`Taking time`,':00'))) %>% 
-  data.frame() 
+# donT=data.table::fread(input = '0-data/PAR Time.csv') %>%
+#   filter(File!='') %>% 
+#   mutate(start=dmy_hms(paste0(`Day of setting`,'_',`Setting Time`,':00')),
+#          end=dmy_hms(paste0(`Day of taking`,'_',`Taking time`,':00'))) %>% 
+#   data.frame() 
 
 
 server<-function(input, output) {
@@ -102,14 +102,21 @@ server<-function(input, output) {
           
           fileName=file()$name[f]
           # print(fileName)
-          TimeStart=ymd_hms(donT[donT$File==str_remove(fileName,'.CSV'),'start'])
+          # TimeStart=ymd_hms(donT[donT$File==str_remove(fileName,'.CSV'),'start'])
+          
+          # don_raw=data.table::fread(input =  file()$path[f]) %>% 
+          #   mutate(time=TimeStart+Timestamp,
+          #          ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
+          #   tidyr::separate(col = ref,into =vecName ,sep='#') 
           
           don_raw=data.table::fread(input =  file()$path[f]) %>% 
-            mutate(time=TimeStart+Timestamp,
+            data.frame() %>% 
+            mutate(time=dmy_hms(paste0(Date,':00')),
+                   Date=str_sub(Date,1,10),
                    ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
             tidyr::separate(col = ref,into =vecName ,sep='#') 
           
-          don=don_raw %>% select(ID,Timestamp,Days,Hours,Minutes,time,RawData)
+          don=don_raw %>% select(ID,Timestamp,Date,Days,Hours,Minutes,time,RawData)
           for (i in 1: nbSlots){
             dsub=don_raw %>%
               mutate(info=paste(get(paste0('slot',i)),get(paste0('value',i))))
@@ -131,7 +138,7 @@ server<-function(input, output) {
           
           
           donF_sub=merge(donF_sub,tableSlot) %>% 
-            mutate(Date=str_sub(time,1,10),
+            mutate(Date=dmy(Date),
                    hms=hms(str_sub(time,12,19)),
                    value=ifelse(sensor=='T3 S1',value*coefFR,value),
                    value=ifelse(sensor=='T2 S1',value*coefPAR,value))    
@@ -158,7 +165,9 @@ server<-function(input, output) {
       if (is.null(don())){
         return(NULL)
       }
-      print(don())
+      print(don()$Date)
+      
+      print(paste('min date-------',min(don()$Date,na.rm=T)))
       
       dateRangeInput('Time', 'Select a date range:',
                      start =min(ymd(don()$Date)),
@@ -191,7 +200,7 @@ server<-function(input, output) {
       minDate <- input$Time[1]
       maxDate <- input$Time[2]
       # )
-      
+     
       graph=don() %>%
         filter(variable %in% input$variable) %>%
         filter(Date>=minDate & Date<=maxDate)%>%

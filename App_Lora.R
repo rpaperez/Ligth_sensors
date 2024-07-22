@@ -231,6 +231,7 @@ server<-function(input, output) {
 
         
       ###select Dates
+      
       # isolate(
       minDate <- input$Time[1]
       maxDate <- input$Time[2]

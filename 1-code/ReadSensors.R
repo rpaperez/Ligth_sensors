@@ -43,14 +43,21 @@ files=list.files(path = '0-data/',pattern = 'DATA')
 for (file in files){
   # file=files[1]
   
-  TimeStart=ymd_hms(donT[donT$File==str_remove(file,'.CSV'),'start'])
+  # TimeStart=ymd_hms(donT[donT$File==str_remove(file,'.CSV'),'start'])
+  
+  # don_raw=data.table::fread(input = paste0('0-data/',file)) %>% 
+  #   mutate(time=TimeStart+Timestamp,
+  #          ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
+  #   tidyr::separate(col = ref,into =vecName ,sep='#') 
   
   don_raw=data.table::fread(input = paste0('0-data/',file)) %>% 
-    mutate(time=TimeStart+Timestamp,
+    data.frame() %>% 
+    mutate(time=dmy_hms(paste0(Date,':00')),
+           Date=str_sub(Date,1,10),
            ref=str_sub(RawData,start=4,end=str_length(RawData)-1)) %>% 
     tidyr::separate(col = ref,into =vecName ,sep='#') 
   
-  don=don_raw %>% select(ID,Timestamp,Days,Hours,Minutes,time,RawData)
+  don=don_raw %>% select(ID,Timestamp,Days,Hours,Minutes,Date,time,RawData)
   for (i in 1: nbSlots){
     dsub=don_raw %>%
       mutate(info=paste(get(paste0('slot',i)),get(paste0('value',i))))
