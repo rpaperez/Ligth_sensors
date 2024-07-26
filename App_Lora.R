@@ -89,7 +89,12 @@ tableSlot_C2=data.frame(Logger='C2',
                         sensor=c("T0","T1","T2","T3","T4","T5"),
                         variable=c('Battery','PAR','PAR','PAR','PAR','PAR'))
 
-tableSlot=rbind(tableSlot_C1,tableSlot_C2)
+
+tableSlot_C3=data.frame(Logger='C3',
+                        sensor=c("T0","T1","T2","T3","T4","T5"),
+                        variable=c('Battery','PAR','FR2','PAR2','FR1','PAR1'))
+
+tableSlot=rbind(tableSlot_C1,tableSlot_C2,tableSlot_C3)
 
 
 
@@ -236,8 +241,11 @@ server<-function(input, output) {
       minDate <- input$Time[1]
       maxDate <- input$Time[2]
       # )
+      print(unique(don()$variable))
       
       graph=don() %>%
+        mutate(variable=str_remove(variable,'2')) %>% 
+        mutate(variable=str_remove(variable,'1')) %>% 
         filter(variable %in% input$variable) %>%
         filter(sensor %in% Sensors) %>%
         filter(Logger %in% Loggers) %>%
