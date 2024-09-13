@@ -30,29 +30,37 @@ ui<-fluidPage(
                                   'Battery'='Battery')),
                  
                  
-                 selectInput("Loggers", "Select logger(s):",
-                             list('All'='All',
-                                  'C1'='C1',
-                                  'C2'='C2',
-                                  'C3'='C3')),
+                 # selectInput("Loggers", "Select logger(s):",
+                 #             list('All'='All',
+                 #                  'C1'='C1',
+                 #                  'C2'='C2',
+                 #                  'C3'='C3')),
                  
-                 selectInput("Sensors", "Select sensor(s):",
-                             list('All'='All',
-                                  'T1'='T1',
-                                  'T2'='T2',
-                                  'T3'='T3',
-                                  'T4'='T4',
-                                  'T5'='T5'
-                                  ))
+                 # selectInput("Treatment", "Select Treatments:",
+                 #             list('All'='All',
+                 #                  'Control'='Control',
+                 #                  'AFS'='AFS',
+                 #                  'NS'='NS',
+                 #                  'Open-Field'='Open-Field',
+                 #                  'Filters'='Filters'
+                 #             )),
                  
- 
-             ),
-             mainPanel(
-               tableOutput('contents'),
-               plotlyOutput("graph")
+                 selectInput("SPA", "Select SPA:",
+                             list('All'='All',
+                                  'Central'='Central',
+                                  'West'='West',
+                                  'East'='East',
+                                  'Incident'='Incident',
+                                  'Filters'='Filters'                             ))
+                 
+                 
+               ),
+               mainPanel(
+                 tableOutput('contents'),
+                 plotlyOutput("graph")
+               )
              )
   )
-)
 )
 
 
@@ -74,7 +82,6 @@ coefPAR=10.0 #micromol.m-2.s-1 per mV
 
 tableCoeff=data.frame(variable=c('Battery','PAR','PAR1','PAR2','FR1','FR2'),
                       Coeff=c(1,coefPAR,coefPAR1,coefPAR2,coefFR1,coefFR2))
-
 ## vector of info names in the RawData column
 nbSlots=6
 names=paste0(c('slot','value'),rep(x = c(1:nbSlots),each=2))
@@ -83,16 +90,22 @@ vecName= c('Logger',names)
 
 tableSlot_C1=data.frame(Logger='C1',
                         sensor=c("T0","T1","T2","T3","T4","T5"),
-                        variable=c('Battery','PAR','PAR','PAR','PAR','PAR'))
+                        variable=c('Battery','PAR','PAR','PAR','PAR','PAR'),
+                        Treatment=c('','Control','Control','Control','Filter-cheap','Open-Field'),
+                        SPA=c('','East','Central','West','Filters','Incident'))
 
 tableSlot_C2=data.frame(Logger='C2',
                         sensor=c("T0","T1","T2","T3","T4","T5"),
-                        variable=c('Battery','PAR','PAR','PAR','PAR','PAR'))
+                        variable=c('Battery','PAR','PAR','PAR','PAR','PAR'),
+                        Treatment=c('','AFS','AFS','NS','NS','Filter-exp'),
+                        SPA=c('','Central','West','West','Central','Filters'))
 
 
 tableSlot_C3=data.frame(Logger='C3',
                         sensor=c("T0","T1","T2","T3","T4","T5"),
-                        variable=c('Battery','PAR','FR2','PAR2','FR1','PAR1'))
+                        variable=c('Battery','PAR','FR2','PAR2','FR1','PAR1'),
+                        Treatment=c('','Open-Field','AFS','AFS','NS','NS'),
+                        SPA=c('','Incident','East','East','East','East'))
 
 tableSlot=rbind(tableSlot_C1,tableSlot_C2,tableSlot_C3)
 
@@ -162,7 +175,7 @@ server<-function(input, output) {
                    sensor=str_remove(sensor,' S1'),
                    sensor=str_remove(sensor,' S4'))
           
-  
+          
           
           donF=merge(donF,tableSlot)
           donF=merge(donF,tableCoeff)
@@ -220,41 +233,63 @@ server<-function(input, output) {
         ylab='Far Red (micro mol m-2 s-1)'}
       # 
       
-
-      Sensors=input$Sensors
-      print(paste('Sensors',Sensors))  
-      if(Sensors=='All'){
-        Sensors=c('T0','T1','T2','T3','T4','T5')
+      
+      # Sensors=input$Sensors
+      # print(paste('Sensors',Sensors))  
+      # if(Sensors=='All'){
+      #   Sensors=c('T0','T1','T2','T3','T4','T5')
+      # }
+      
+      
+      # Loggers=input$Loggers
+      # print(paste('Loggers',Loggers))  
+      # if(Loggers=='All'){
+      #   Loggers=c('C1','C2','C3')
+      # }
+      
+      SPA_select=input$SPA
+      print(paste('SPA',SPA_select))  
+      if(SPA_select=='All'){
+        SPA_select=c('','East','Central','West','Filters','Incident')
       }
       
-
-      Loggers=input$Loggers
-      print(paste('Loggers',Loggers))  
-      if(Loggers=='All'){
-        Loggers=c('C1','C2','C3')
-      }
-
-        
+      
       ###select Dates
       
       # isolate(
       minDate <- input$Time[1]
       maxDate <- input$Time[2]
       # )
-      # print(unique(don()$variable))
+      print(unique(don()$variable))
       
-      graph=don() %>%
-        mutate(variable=str_remove(variable,'2')) %>% 
-        mutate(variable=str_remove(variable,'1')) %>% 
-        filter(variable %in% input$variable) %>%
-        filter(sensor %in% Sensors) %>%
-        filter(Logger %in% Loggers) %>%
-        filter(Date>=minDate & Date<=maxDate)%>%
-        ggplot(aes(x=time,y=value,col=sensor,group=paste(sensor,Logger,DATA)))+
-        geom_line()+
-        facet_grid(~Logger,scale='free_y')+
-        scale_x_datetime()+
-        labs(y=ylab)
+      if ( input$variable!='Battery'){
+        graph=don() %>%
+          mutate(variable=str_remove(variable,'2')) %>% 
+          mutate(variable=str_remove(variable,'1')) %>% 
+          filter(variable %in% input$variable) %>%
+          filter(SPA %in% SPA_select) %>%
+          # filter(Logger %in% Loggers) %>%
+          filter(Date>=minDate & Date<=maxDate)%>%
+          ggplot(aes(x=time,y=value,col=Treatment,group=paste(sensor,Logger,DATA)))+
+          geom_line()+
+          facet_wrap(~SPA,scale='free_y')+
+          scale_x_datetime()+
+          labs(y=ylab)
+      }
+      
+      if ( input$variable=='Battery'){
+        graph=don() %>%
+          mutate(variable=str_remove(variable,'2')) %>% 
+          mutate(variable=str_remove(variable,'1')) %>% 
+          filter(variable %in% input$variable) %>%
+          # filter(Logger %in% Loggers) %>%
+          filter(Date>=minDate & Date<=maxDate)%>%
+          ggplot(aes(x=time,y=value,col=Logger,group=paste(sensor,Logger,DATA)))+
+          geom_hline(yintercept = 3.5)+
+          geom_line()+
+          scale_x_datetime()+
+          labs(y=ylab)
+      }
       
       return(graph)
     })
